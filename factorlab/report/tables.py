@@ -31,6 +31,8 @@ def write_regression_table(
         **{f"t_{c}": res.t_beta[c] for c in res.spec.factors},
         "adj_R2": res.r2adj,
     })
-    path = Path(tables_dir) / f"regression_{res.spec.name.lower()}.csv"
-    out.to_csv(path, float_format="%.3f")
-    return path
+    tables_dir = Path(tables_dir)
+    tables_dir.mkdir(parents=True, exist_ok=True)
+    out_path = tables_dir / f"regression_{res.spec.name.lower()}.csv"
+    out.to_csv(out_path, float_format="%.3f")
+    return out_path

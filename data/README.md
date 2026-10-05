@@ -7,6 +7,12 @@ All data come from the **Kenneth R. French Data Library**
 constructed from the **August 2026 Bloomberg database**. The library is free
 for research use; please cite French's data library when reusing.
 
+## License note
+
+The French Data Library is free for research use; please cite it when reusing.
+For **commercial** deployments, check the library's terms — you may need to
+compute factors from licensed price data instead of redistributing these files.
+
 ## Files (vendored under `data/raw/` for reproducibility)
 
 | File | Contents |

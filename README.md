@@ -10,11 +10,20 @@ from a single YAML config file.
 Its flagship example replicates the Fama-French 3-factor (1993) and 5-factor
 (2015) models on European equities, July 1990 – August 2026.
 
+## Installation
+
+```bash
+pip install -r requirements.txt        # runtime deps
+# or install as a package (gives you the `factorlab` command):
+pip install .
+pip install -r requirements-dev.txt   # pytest, for development
+```
+
 ## Quickstart
 
 ```bash
-pip install -r requirements.txt
 python -m factorlab run examples/europe_ff3_ff5/config.yaml
+# or, after pip install .:  factorlab run examples/europe_ff3_ff5/config.yaml
 ```
 
 That's it. Everything below is regenerated under `results/`:
@@ -47,6 +56,21 @@ from factorlab.models.specs import custom_model
 from factorlab.tests import run_regressions, grs_test
 ```
 
+### Config reference
+
+| Section | Key | Meaning |
+|---|---|---|
+| `data` | `format` | `french_library` or `csv` |
+| `data` | `factors` / `portfolios` | input files (relative to the config) |
+| `data` | `start` / `end` | sample window, e.g. `1990-07` |
+| `universe` | `factors` | all factor columns (incl. risk-free) |
+| `universe` | `risk_free` | risk-free column for excess returns |
+| `universe` | `test_assets` | `all` or a list of portfolio columns |
+| `models` | `<name>: [...]` | model name → factor columns |
+| `tests` | `grs` | run the GRS joint-alpha test (default true) |
+| `tests` | `cov_type` | `nonrobust` (default) or `HAC` for Newey-West |
+| `output` | `dir` / `tearsheet` | where results go |
+
 ## Framework layout
 
 ```
@@ -61,11 +85,19 @@ factorlab/
 └── cli.py       # python -m factorlab run|download
 examples/
 └── europe_ff3_ff5/   # flagship study: config + notes
+tests/                # pytest suite (17 tests: unit + integration)
 ```
 
-Optional extensions: `tests.cov_type: "HAC"` with `cov_kwds: {maxlags: 6}`
-switches regressions to Newey-West standard errors (the GRS test always uses
-plain OLS residuals, as in the original paper).
+## Testing
+
+```bash
+pytest -q
+```
+
+The suite includes regression tests pinned to the flagship study's committed
+outputs (factor premia, alphas, GRS statistics), so any change that alters
+published numbers fails loudly. CI runs on Python 3.10–3.12
+(`.github/workflows/ci.yml`).
 
 ---
 
@@ -108,15 +140,17 @@ Full tables: [`results/tables/`](results/tables/) · Figures:
 [`results/figures/`](results/figures/) · Tearsheet:
 [`results/tearsheet.md`](results/tearsheet.md)
 
-## Docs
+---
 
-- **[Full academic report](report/REPORT.md)** ([PDF](report/REPORT.pdf)) — the
-  questions behind the factor design, literature, data, methodology, results,
-  and limitations of the flagship study.
-- **[Glossary](GLOSSARY.md)** — asset-pricing terminology (English + 中文).
-- **[References](REFERENCES.md)** — cited literature.
+## Commercial use & data licensing
+
+`factorlab` itself is MIT-licensed — use it commercially freely. Note the
+**data** is a separate matter: the Kenneth R. French Data Library is free for
+research use; if you deploy factorlab commercially, check the library's terms
+and consider computing factors from licensed price data instead. The example
+CSVs under `data/raw/` are vendored for reproducibility of the flagship study.
 
 ## Disclaimer
 
-Educational research framework. Nothing here is investment advice. Factor premia
-are historical averages; they do not predict future returns.
+Research framework. Nothing here is investment advice. Factor premia are
+historical averages; they do not predict future returns.

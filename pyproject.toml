@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "factorlab"
+version = "0.1.0"
+description = "YAML-configured factor research framework: data ingestion, premia statistics, time-series regressions, GRS tests, auto tearsheets"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Lianru Liu" }]
+keywords = ["asset-pricing", "factor-models", "fama-french", "quantitative-finance"]
+dependencies = [
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "matplotlib>=3.7",
+    "scipy>=1.10",
+    "statsmodels>=0.14",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+factorlab = "factorlab.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["factorlab*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

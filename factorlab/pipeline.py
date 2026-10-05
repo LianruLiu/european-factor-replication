@@ -1,6 +1,7 @@
 """Study pipeline: config in, tables + figures + tearsheet out."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -16,31 +17,46 @@ from factorlab.report.tearsheet import write_tearsheet
 from factorlab.tests.grs import grs_test
 from factorlab.tests.timeseries import run_regressions
 
+log = logging.getLogger("factorlab")
 
-def run(config_path: str | Path) -> dict[str, Any]:
+
+def run(config_path: str | Path, output_dir: str | Path | None = None) -> dict[str, Any]:
     """Run a full factor study from a YAML config file.
 
+    Parameters
+    ----------
+    config_path : path to the study's ``config.yaml``.
+    output_dir  : optional override for ``output.dir`` (useful in tests).
+
     Returns a dict with the computed tables (handy in notebooks).
+    Raises ValueError with a clear message on bad configs or missing data.
     """
     cfg = load_config(config_path)
     root: Path = cfg["_root"]
     data_cfg, uni = cfg["data"], cfg["universe"]
     out_cfg = cfg.get("output", {})
 
-    out_dir = resolve(out_cfg.get("dir", "results"), root)
+    out_dir = Path(output_dir) if output_dir else resolve(out_cfg.get("dir", "results"), root)
     tables_dir = out_dir / "tables"
     figs_dir = out_dir / "figures"
+
+    models = from_config(cfg["models"])
 
     # ---- 1. load data ----
     fmt = data_cfg.get("format", "french_library")
     fpath = resolve(data_cfg["factors"], root)
     ppath = resolve(data_cfg["portfolios"], root)
+    for label, p in (("data.factors", fpath), ("data.portfolios", ppath)):
+        if not p.exists():
+            raise ValueError(f"{label}: file not found: {p}")
     if fmt == "french_library":
         factors = load_french_factors(fpath)
         ports = load_french_portfolios(ppath)
-    else:
+    elif fmt == "csv":
         factors = load_csv(fpath)
         ports = load_csv(ppath)
+    else:
+        raise ValueError(f"data.format must be 'french_library' or 'csv', got {fmt!r}")
 
     # ---- 2. sample window ----
     if data_cfg.get("start"):
@@ -50,20 +66,33 @@ def run(config_path: str | Path) -> dict[str, Any]:
         factors = factors.loc[:data_cfg["end"]]
         ports = ports.loc[:data_cfg["end"]]
     data = factors.join(ports, how="inner").dropna()
+    if data.empty:
+        raise ValueError("sample is empty after aligning factors and portfolios "
+                         "(check data.start/data.end and file contents)")
     T = len(data)
     sample_label = (f"{data.index.min().date()} to {data.index.max().date()} "
                     f"(T={T})")
-    print(f"Sample: {sample_label}")
+    log.info("Sample: %s", sample_label)
 
     fcols_all = uni["factors"]
     rf = uni["risk_free"]
     ta = uni.get("test_assets")
     pcols = (list(ports.columns) if (not ta or ta == "all")
              else [c for c in ports.columns if c in ta])
+    if not pcols:
+        raise ValueError("universe.test_assets selected no portfolios")
+
+    # ---- 3. validate every column we are about to use ----
+    needed = set(fcols_all) | {rf} | {f for spec in models for f in spec.factors}
+    missing = sorted(c for c in needed if c not in data.columns)
+    if missing:
+        raise ValueError(
+            "columns missing from data: " + ", ".join(missing) +
+            ". Check universe.factors and models: against your files.")
 
     # ---- 3. factor summary stats ----
     stats = premia_stats(data[fcols_all])
-    print(stats.round(2).to_string())
+    log.info("\n%s", stats.round(2).to_string())
 
     # ---- 4. test-asset excess returns ----
     Y = data[pcols].sub(data[rf], axis=0)
@@ -72,17 +101,20 @@ def run(config_path: str | Path) -> dict[str, Any]:
     tests_cfg = cfg.get("tests", {})
     cov_type = tests_cfg.get("cov_type", "nonrobust")
     cov_kwds = tests_cfg.get("cov_kwds")
-    models = from_config(cfg["models"])
     results, reg_tables = {}, {}
     for spec in models:
+        if T <= len(pcols) + spec.k:
+            raise ValueError(
+                f"{spec.name}: not enough observations (T={T}) for "
+                f"N={len(pcols)} assets and K={spec.k} factors")
         res = run_regressions(Y, data[spec.factors], spec,
                               cov_type=cov_type, cov_kwds=cov_kwds)
         results[spec.name] = res
         reg_tables[spec.name] = _regression_frame(res)
         write_regression_table(res, tables_dir)
         sig = int((res.t_alpha.abs() > 2).sum())
-        print(f"{spec.name}: {sig}/{len(pcols)} significant alphas, "
-              f"mean adj. R^2 = {res.r2adj.mean():.3f}")
+        log.info("%s: %d/%d significant alphas, mean adj. R^2 = %.3f",
+                 spec.name, sig, len(pcols), res.r2adj.mean())
 
     # ---- 6. GRS tests ----
     grs_rows = []
@@ -95,7 +127,7 @@ def run(config_path: str | Path) -> dict[str, Any]:
     grs = pd.DataFrame(grs_rows)
     write_summary_tables(stats, grs_rows, tables_dir)
     if not grs.empty:
-        print(grs.set_index("model").to_string())
+        log.info("\n%s", grs.set_index("model").to_string())
 
     # ---- 7. figures ----
     figs_wanted = out_cfg.get("figures", ["all"])
@@ -119,8 +151,8 @@ def run(config_path: str | Path) -> dict[str, Any]:
                         out_dir / ts_name,
                         notes=cfg.get("report", {}).get("notes", ""))
 
-    print(f"tables -> {tables_dir}")
-    print(f"figures -> {figs_dir}")
+    log.info("tables -> %s", tables_dir)
+    log.info("figures -> %s", figs_dir)
     return {"config": cfg, "factor_stats": stats, "grs": grs,
             "reg_tables": reg_tables, "results": results}
 
