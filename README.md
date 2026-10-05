@@ -1,36 +1,90 @@
-# Replicating the Fama-French Factor Models on European Equities
+# factorlab — a YAML-configured factor research framework
 
-An independent, fully reproducible replication of the Fama-French 3-factor (1993)
-and 5-factor (2015) asset-pricing models on European stock market data,
-using the Kenneth R. French Data Library.
+**Plug in your data. Pick your models. Get a full asset-pricing study.**
+
+`factorlab` turns a factor-research idea into a reproducible study — data
+loading, factor premia statistics, time-series regressions, Gibbons-Ross-Shanken
+(1989) joint-alpha tests, tables, figures, and an auto-generated tearsheet —
+from a single YAML config file.
+
+Its flagship example replicates the Fama-French 3-factor (1993) and 5-factor
+(2015) models on European equities, July 1990 – August 2026.
+
+## Quickstart
+
+```bash
+pip install -r requirements.txt
+python -m factorlab run examples/europe_ff3_ff5/config.yaml
+```
+
+That's it. Everything below is regenerated under `results/`:
+
+- `results/tables/` — factor summary stats, per-model regressions, GRS tests (CSV)
+- `results/figures/` — cumulative factors, alphas, HML dynamics, excess returns (PNG)
+- `results/tearsheet.md` — auto-generated headline summary
+
+## Your own study in 5 minutes
+
+1. Copy `examples/europe_ff3_ff5/` to `examples/my_study/`.
+2. Point `data.factors` / `data.portfolios` at your files
+   (French-library format, or any CSV with a date column — set
+   `data.format: csv`).
+3. Edit `models:` — use a preset or define your own:
+   ```yaml
+   models:
+     FF5: ["Mkt-RF", "SMB", "HML", "RMW", "CMA"]
+     FF5+MOM: ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "MOM"]
+   ```
+4. Run: `python -m factorlab run examples/my_study/config.yaml`
+
+Python API works too:
+
+```python
+from factorlab.pipeline import run
+run("examples/europe_ff3_ff5/config.yaml")
+
+from factorlab.models.specs import custom_model
+from factorlab.tests import run_regressions, grs_test
+```
+
+## Framework layout
+
+```
+factorlab/
+├── data/        # loaders: French Data Library, generic CSVs, downloader
+├── factors/     # premia stats (ann. mean/vol/t-stat/Sharpe), rolling stats
+├── models/      # ModelSpec + presets (FF3, FF5, Carhart4, CAPM, custom)
+├── tests/       # time-series OLS (+ optional Newey-West), GRS F-test
+├── report/      # CSV tables, PNG figures, auto tearsheet
+├── config.py    # YAML loading / validation
+├── pipeline.py  # run(config) — the whole study end to end
+└── cli.py       # python -m factorlab run|download
+examples/
+└── europe_ff3_ff5/   # flagship study: config + notes
+```
+
+Optional extensions: `tests.cov_type: "HAC"` with `cov_kwds: {maxlags: 6}`
+switches regressions to Newey-West standard errors (the GRS test always uses
+plain OLS residuals, as in the original paper).
+
+---
+
+## Flagship example: Fama-French on European equities
 
 **Research question.** Do the size, value, profitability, and investment premia
 documented on U.S. data also price the cross-section of European equity returns —
 and does the five-factor model explain the test assets its predecessor could not?
 
-## Data
+**Data.** Kenneth R. French Data Library (August 2026 Bloomberg vintage):
+monthly European factors `Mkt-RF, SMB, HML, RMW, CMA, RF` and 25 value-weighted
+Size–B/M portfolios, July 1990 – August 2026 (**T = 434**). Raw files vendored
+under `data/raw/`; see `data/README.md`.
 
-- **Source:** Kenneth R. French Data Library (constructed from the August 2026
-  Bloomberg database; free for research use).
-- **Factors (monthly):** `Mkt-RF`, `SMB`, `HML`, `RMW`, `CMA`, `RF` — Europe region.
-- **Test assets (monthly):** 25 value-weighted portfolios formed on Size and
-  Book-to-Market — the classic Fama-French (1993) test assets.
-- **Sample:** July 1990 – August 2026, **T = 434 months**.
-- Raw files are vendored under `data/raw/`; see `data/README.md` for the source
-  and refresh instructions.
+**Method.** For each test asset, time-series OLS of excess returns on the
+factors; models compared via adjusted R², count of significant alphas, and the
+GRS F-test of joint α = 0.
 
-## Method
-
-For each of the 25 Size–B/M portfolios, time-series OLS regressions of excess
-returns on the factor returns:
-
-- **FF3:** R − Rf = α + b·(Mkt−Rf) + s·SMB + h·HML + ε
-- **FF5:** R − Rf = α + b·(Mkt−Rf) + s·SMB + h·HML + r·RMW + c·CMA + ε
-
-Model fit is compared via adjusted R², the count of significant alphas, and the
-Gibbons–Ross–Shanken (1989) F-test of the joint hypothesis α₁ = … = α₂₅ = 0.
-
-## Key findings
+### Key findings
 
 | Factor | Ann. mean | Ann. vol | t(mean) | Sharpe |
 |--------|-----------|----------|---------|--------|
@@ -40,58 +94,29 @@ Gibbons–Ross–Shanken (1989) F-test of the joint hypothesis α₁ = … = α�
 | RMW    | 3.60% | 5.56%  | 3.89 | 0.65 |
 | CMA    | 1.71% | 6.21%  | 1.66 | 0.28 |
 
-- **The size premium is essentially zero in Europe** (0.15%/yr, t = 0.12) —
-  consistent with the post-publication decay of the size effect.
-- **Value (HML) and profitability (RMW) premia are statistically significant**,
-  with RMW the strongest (Sharpe 0.65).
-- **The textbook "small-growth problem" replicates:** the small-growth portfolio
-  earns an FF3 alpha of **−5.16%/yr (t = −4.94)**; adding RMW and CMA shrinks it
-  to −2.43%/yr (t = −2.38) — the exact motivation for the five-factor model.
-- **HML loadings rise monotonically with book-to-market** within every size
-  quintile, as theory predicts.
-- **Neither model fully passes:** the GRS test rejects joint α = 0 for both
+- **The size premium is essentially zero in Europe** (0.15%/yr, t = 0.12).
+- **Value (HML) and profitability (RMW) premia are significant**; RMW has the
+  highest Sharpe (0.65).
+- **The small-growth problem replicates:** FF3 alpha of **−5.17%/yr
+  (t = −4.94)** shrinks to −2.43%/yr (t = −2.39) under FF5 — the textbook
+  motivation for the five-factor model.
+- **Neither model fully passes:** GRS rejects joint α = 0 for both
   (FF3: F = 3.05, p < 0.001; FF5: F = 2.71, p < 0.001), but FF5 cuts significant
-  alphas from 8 to 6 of 25 and raises mean adjusted R² from 0.942 to 0.946.
+  alphas from 8 to 6 of 25 and lifts mean adjusted R² from 0.942 to 0.946.
 
-Full tables: [`results/tables/`](results/tables/) · Figures: [`results/figures/`](results/figures/)
-
-## Repository structure
-
-```
-├── README.md                 # this file
-├── requirements.txt
-├── data/
-│   ├── README.md             # data source, license, refresh instructions
-│   └── raw/                  # French-library CSVs (vendored for reproducibility)
-├── src/
-│   ├── download.py           # re-download raw data from the French library
-│   └── analyze.py            # parse → summary stats → regressions → GRS → figures
-├── results/
-│   ├── tables/               # factor stats, regression output, GRS test (CSV)
-│   └── figures/              # cumulative factors, alphas, HML dynamics (PNG)
-├── report/
-│   ├── REPORT.md             # full academic report (questions, literature, method, results)
-│   └── REPORT.pdf            # PDF version
-├── GLOSSARY.md               # bilingual glossary of asset-pricing terminology
-└── REFERENCES.md             # academic references
-```
-
-## Reproduce
-
-```bash
-pip install -r requirements.txt
-python src/download.py      # fetch raw data (or use data/raw as-is)
-python src/analyze.py       # regenerates results/tables and results/figures
-```
+Full tables: [`results/tables/`](results/tables/) · Figures:
+[`results/figures/`](results/figures/) · Tearsheet:
+[`results/tearsheet.md`](results/tearsheet.md)
 
 ## Docs
 
-- **[Full academic report](report/REPORT.md)** — the academic questions behind the
-  factor design, literature, data, methodology, results, and limitations.
+- **[Full academic report](report/REPORT.md)** ([PDF](report/REPORT.pdf)) — the
+  questions behind the factor design, literature, data, methodology, results,
+  and limitations of the flagship study.
 - **[Glossary](GLOSSARY.md)** — asset-pricing terminology (English + 中文).
 - **[References](REFERENCES.md)** — cited literature.
 
 ## Disclaimer
 
-Educational replication project. Nothing here is investment advice. Factor premia
+Educational research framework. Nothing here is investment advice. Factor premia
 are historical averages; they do not predict future returns.

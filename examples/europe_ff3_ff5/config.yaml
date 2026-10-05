@@ -1,0 +1,46 @@
+# factorlab example: replicate the Fama-French 3- and 5-factor models
+# on European equities (Kenneth R. French Data Library).
+#
+# Run from the repo root:
+#   python -m factorlab run examples/europe_ff3_ff5/config.yaml
+
+study: "European Fama-French 3- and 5-factor replication"
+
+data:
+  format: french_library
+  factors: "../../data/raw/Europe_5_Factors.csv"
+  portfolios: "../../data/raw/Europe_25_Portfolios_ME_BE-ME.csv"
+  # source (for provenance; use `python -m factorlab download` to re-fetch):
+  #   https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Europe_5_Factors_CSV.zip
+  #   https://mba.tuck.dartmouth.edu/pages/faculty/ken.french/ftp/Europe_25_Portfolios_ME_BE-ME_CSV.zip
+  start: "1990-07"
+  end: "2026-08"
+
+universe:
+  factors: ["Mkt-RF", "SMB", "HML", "RMW", "CMA", "RF"]
+  risk_free: "RF"
+  test_assets: "all"   # all 25 Size-B/M portfolios
+
+models:
+  FF3: ["Mkt-RF", "SMB", "HML"]
+  FF5: ["Mkt-RF", "SMB", "HML", "RMW", "CMA"]
+  # try your own, e.g.:
+  # Carhart4: ["Mkt-RF", "SMB", "HML", "MOM"]
+
+tests:
+  grs: true
+  cov_type: "nonrobust"   # or "HAC" with cov_kwds: {maxlags: 6} for Newey-West
+
+output:
+  dir: "../../results"
+  figures: ["all"]
+  tearsheet: true
+  tearsheet_name: "tearsheet.md"
+
+report:
+  study_title: "European"
+  region_label: "Europe"
+  test_assets_label: "25 European Size-B/M portfolios"
+  base_date_label: "Jul 1990"
+  hml_col: "HML"
+  notes: "Test assets are the 25 value-weighted Size-B/M portfolios (Fama-French 1993 design)."

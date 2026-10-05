@@ -15,15 +15,20 @@ for research use; please cite French's data library when reusing.
 | `Europe_25_Portfolios_ME_BE-ME.csv` | Monthly returns of 25 value-weighted Size–B/M portfolios, Europe (Jul 1990 – Aug 2026) |
 
 Missing values are coded as `-99.99` in the source files and treated as NaN
-by `src/analyze.py`.
+by `factorlab.data.loaders`.
 
 ## Refresh
 
 To re-download the latest vintage:
 
 ```bash
-python src/download.py
+python -m factorlab download Europe_5_Factors_CSV.zip Europe_25_Portfolios_ME_BE-ME_CSV.zip --dest data/raw
 ```
 
-then re-run `python src/analyze.py`. Note that results will change slightly as
-the library is updated each month.
+then re-run the study:
+
+```bash
+python -m factorlab run examples/europe_ff3_ff5/config.yaml
+```
+
+Note that results will change slightly as the library is updated each month.
